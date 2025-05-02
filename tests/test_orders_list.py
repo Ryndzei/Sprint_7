@@ -12,4 +12,6 @@ class TestOrdersList:
         response = requests.get(ORDERS_GET_LIST_URL)
         body = response.json()
 
-        assert "orders" in body and isinstance(body["orders"], list)
+        with (allure.step("Отправляем GET /orders")):
+            assert "orders" in body, "orders нет в теле ответа"
+            assert isinstance(body["orders"], list), "значение ключа orders не является списком"

@@ -1,5 +1,6 @@
-from urls import COURIER_LOGIN_URL, COURIER_DELETE_URL
-from random_data import *
+from data import payload_with_no_required_field, payload_with_existing_login
+from random_data import return_random_login_password
+from urls import COURIER_CREATE_URL
 import requests
 import allure
 
@@ -13,59 +14,51 @@ class TestCreateCourier:
      Генерируем уникальный логин/пароль через вспомогательную функцию,
      отправляем POST /courier и ожидаем 201 + {"ok": true}.
      """)
-    def test_create_courier_successfully(self):
+    def test_create_courier_successfully(self, courier_cleanup):
         payload = return_random_login_password()
-        response = requests.post(COURIER_CREATE_URL, json=payload)
+        courier_cleanup.update(payload)
+        print(payload)
+        with (allure.step("Отправляем POST /courier")):
+            response = requests.post(COURIER_CREATE_URL, json=payload)
 
-        assert response.status_code == 201 and response.json() == {"ok": True}
-
-        # Удаление созданного курьера
-        response_login = requests.post(COURIER_LOGIN_URL, json=payload)
-        assert response_login.status_code == 200
-        courier_id = response_login.json().get("id")
-
-        response_delete = requests.delete(f"{COURIER_DELETE_URL}/{courier_id}")
-        assert response_delete.status_code == 200 and response_delete.json() == {"ok": True}
+            assert response.status_code == 201, "Код ответа не 201"
+            assert response.json() == {"ok": True}, "Тело ответа не соответствует строго ожидаемому"
 
     @allure.title("Ошибка при попытке создать дубликат курьера")
     @allure.description("""
     Сначала создаём курьера, затем повторный POST /courier с тем же логином
     должен вернуть 409 и сообщение «Этот логин уже используется».
     """)
-    def test_create_two_same_couriers_error(self):
-        login_data = register_new_courier_and_return_login_password()
-        response = requests.post(COURIER_CREATE_URL, json={
-            "login": login_data[0],
-            "password": login_data[1]
-        })
+    def test_create_two_same_couriers_error(self, courier_cleanup):
+        payload = return_random_login_password()
+        courier_cleanup.update(payload)
 
-        assert response.status_code == 409 and response.json() == {"message": "Этот логин уже используется"}
+        with (allure.step("Отправляем первый POST /courier")):
+            response_create = requests.post(COURIER_CREATE_URL, json=payload)
+            assert response_create.status_code == 201 and response_create.json() == {"ok": True}
 
-        # Удаление созданного курьера
-        response_login = requests.post(COURIER_LOGIN_URL, json={
-            "login": login_data[0],
-            "password": login_data[1]
-        })
-        assert response_login.status_code == 200
-        courier_id = response_login.json().get("id")
+        with (allure.step("Пробуем отправить второй POST /courier с телом как у первого")):
+            response_error = requests.post(COURIER_CREATE_URL, json=payload)
 
-        response_delete = requests.delete(f"{COURIER_DELETE_URL}/{courier_id}")
-        assert response_delete.status_code == 200 and response_delete.json() == {"ok": True}
+            assert response_error.status_code == 409, "Код ответа не 409"
+            assert response_error.json() == {"message": "Этот логин уже используется"}, "Тело ответа не соответствует строго ожидаемому"
 
     @allure.title("Ошибка при отсутствии обязательного поля")
     @allure.description("Отправляем POST /courier без поля login и ожидаем 400 + сообщение об ошибке.")
     def test_create_courier_with_no_required_field_error(self):
-        response = requests.post(COURIER_CREATE_URL, data={
-            "password": "1234",
-            "firstName": "saske"
-        })
-        assert response.status_code == 400 and response.json() == {"message": "Недостаточно данных для создания учетной записи"}
+
+        with (allure.step("Отправляем POST /courier с телом без обязательного поля login")):
+            response = requests.post(COURIER_CREATE_URL, json=payload_with_no_required_field)
+
+            assert response.status_code == 400, "Код ответа не 400"
+            assert response.json() == {"message": "Недостаточно данных для создания учетной записи"}, "Тело ответа не соответствует строго ожидаемому"
 
     @allure.title("Ошибка при создании курьера с уже существующим логином")
     @allure.description("Используем занятый логин ninja, ожидаем 409 + сообщение «Этот логин уже используется».")
     def test_create_courier_with_existing_login_error(self):
-        response = requests.post(COURIER_CREATE_URL, json={
-            "login": "ninja",
-            "password": "1234"
-        })
-        assert response.status_code == 409 and response.json() == {"message": "Этот логин уже используется"}
+
+        with (allure.step("Отправляем POST /courier с уже существующим в БД логином")):
+            response = requests.post(COURIER_CREATE_URL, json=payload_with_existing_login)
+
+            assert response.status_code == 409, "Код ответа не 409"
+            assert response.json() == {"message": "Этот логин уже используется"}, "Тело ответа не соответствует строго ожидаемому"
