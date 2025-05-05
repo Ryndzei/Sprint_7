@@ -1,4 +1,4 @@
-# Sprint_7
+# YandexScooter API Tests
 Тестирование API ЯндексСамоката по [документации](https://qa-scooter.praktikum-services.ru/docs/)
 
 Были выполнены проверки по следующим сценариям:
