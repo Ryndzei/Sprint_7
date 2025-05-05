@@ -17,7 +17,7 @@ class TestCreateCourier:
     def test_create_courier_successfully(self, courier_cleanup):
         payload = return_random_login_password()
         courier_cleanup.update(payload)
-        print(payload)
+
         with (allure.step("Отправляем POST /courier")):
             response = requests.post(COURIER_CREATE_URL, json=payload)
 
